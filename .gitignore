@@ -1,0 +1,36 @@
+**/target
+**/gen-java
+.classpath
+.project
+.settings
+**/.projectile
+**/src/main/resources/generated/*
+**/src/test/resources/miniproj/src/main/generated/*
+**/*~
+/nbproject/
+nbactions.xml
+/0howto
+/Java8.g4
+/doc/quiz-abstract.txt
+/functionalities.org.commented by HUK
+/old/
+/rulesproto.java.commented by HUK
+runtest
+test.rudi
+**/*.aux
+**/*.blg
+**/*.bbl
+**/*.log
+**/*.toc
+**/*.out
+**/*.nav
+**/*.vrb
+**/*.snm
+**/auto
+**/VondaGrammar.output
+**/persistent.nt
+locallibs
+dependency-reduced-pom.xml
+ontologies
+wech
+compile_prereqs.sh
