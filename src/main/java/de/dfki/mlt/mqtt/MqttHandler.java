@@ -41,7 +41,7 @@ public class MqttHandler {
     /** Called when the client lost the connection to the broker */
     @Override
     public void connectionLost(Throwable cause) {
-      log.error("MQTT broker connection lost: {}", cause);
+      log.error("MQTT broker connection lost: {}", cause.toString());
     }
 
     @Override
@@ -68,7 +68,7 @@ public class MqttHandler {
     /** Called when a outgoing publish is complete */
     @Override
     public void deliveryComplete(IMqttDeliveryToken token) {
-      log.debug("{}", token.getMessageId());
+      log.debug("Delivery Complete for id {}", token.getMessageId());
     }
   }
 
