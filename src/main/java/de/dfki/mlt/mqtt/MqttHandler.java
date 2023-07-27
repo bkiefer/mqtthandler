@@ -35,6 +35,7 @@ public class MqttHandler {
   String brokerprotocol = "tcp";
   String brokerhost = "localhost";
   int brokerport = 1883;
+  int millis_reconnect = 0;
 
   private class MyMqttCallback implements MqttCallback {
 
@@ -73,8 +74,6 @@ public class MqttHandler {
   }
 
   public MqttHandler(Map<String, Object> config) throws MqttException {
-    int millis_reconnect = 0;
-
     if (config != null) {
       if (config.containsKey(CFG_MQTT_HOST)) {
         brokerhost = (String) config.get(CFG_MQTT_HOST);
@@ -90,7 +89,7 @@ public class MqttHandler {
       }
     }
     // if MILLIS_RECONNECT is zero, there will be no attempt to reconnect
-    connect(millis_reconnect);
+    connect();
 
     client.setCallback(new MyMqttCallback());
 
@@ -100,7 +99,7 @@ public class MqttHandler {
     //    false);
   }
 
-  public void connect(int millis_reconnect) throws MqttException {
+  public void connect() throws MqttException {
     if (myClientId == null) {
       myClientId = MqttClient.generateClientId();
     }
@@ -114,8 +113,8 @@ public class MqttHandler {
     MqttConnectOptions options = new MqttConnectOptions();
     if (millis_reconnect > 0) {
       options.setAutomaticReconnect(true);
-      options.setConnectionTimeout(millis_reconnect / 1000);
-      options.setMaxReconnectDelay(millis_reconnect);
+      //options.setConnectionTimeout(millis_reconnect / 1000);
+      //options.setMaxReconnectDelay(millis_reconnect);
     }
     /*
     mqttConnectOptions.setUserName("<your_username>");
@@ -148,6 +147,11 @@ public class MqttHandler {
       msg = new MqttMessage(payload.getBytes("UTF-8"));
       msg.setId(id);
       msg.setQos(qos);
+      while (!client.isConnected()) {
+        log.info("Waiting for reconnect");
+        client.connect();
+        Thread.sleep(millis_reconnect);
+      }
       client.publish(topic, msg);
     } catch (UnsupportedEncodingException e) {
       log.error("{}", e);
@@ -155,6 +159,7 @@ public class MqttHandler {
       log.error("{}", e);
     } catch (MqttException e) {
       log.error("{}", e);
+    } catch (InterruptedException e) {
     }
   }
 }
