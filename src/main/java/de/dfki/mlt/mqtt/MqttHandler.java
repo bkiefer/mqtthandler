@@ -122,7 +122,13 @@ public class MqttHandler {
     // using the default socket factory
     mqttConnectOptions.setSocketFactory(SSLSocketFactory.getDefault());
     */
-    client.connect(options);
+    try {
+      client.connect(options);
+    } catch (Exception ex) {
+      log.error("Connecting MQTT client on {}:{} failed: {}",
+          brokerhost, brokerport, ex.getMessage());
+      return;
+    }
     log.info("MQTT client connected");
   }
 
