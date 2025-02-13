@@ -1,12 +1,10 @@
 package de.dfki.mlt.mqtt;
 
 import java.io.UnsupportedEncodingException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Predicate;
 
-import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.IMqttMessageListener;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
@@ -30,48 +28,10 @@ public class MqttHandler {
   private String myClientId = null;
   private MqttClient client;
 
-  private Map<String, Predicate<byte[]>> callbacks = new HashMap<>();
-
   String brokerprotocol = "tcp";
   String brokerhost = "localhost";
   int brokerport = 1883;
   int millis_reconnect = 0;
-
-  private class MyMqttCallback implements MqttCallback {
-
-    /** Called when the client lost the connection to the broker */
-    @Override
-    public void connectionLost(Throwable cause) {
-      log.error("MQTT broker connection lost: {}", cause.toString());
-    }
-
-    @Override
-    public void messageArrived(String topic, MqttMessage message) {
-      log.debug("Message arrived on topic {}: {} {}", topic, message.getId(), message.getQos());
-      Predicate<byte[]> callback = callbacks.get(topic);
-      if (callback != null) {
-        // callback should return true if the payload could be converted and
-        // was a valid argument to the callback
-        if (callback.test(message.getPayload())) {
-          try {
-            client.messageArrivedComplete(message.getId(), message.getQos());
-          } catch (MqttException e) {
-            log.error("{}", e);
-          }
-        } else {
-          log.warn("callback for topic {} failed.", topic);
-        }
-      } else {
-        log.warn("No callback for registered topic {}", topic);
-      }
-    }
-
-    /** Called when a outgoing publish is complete */
-    @Override
-    public void deliveryComplete(IMqttDeliveryToken token) {
-      log.debug("Delivery Complete for id {}", token.getMessageId());
-    }
-  }
 
   public MqttHandler(Map<String, Object> config) throws MqttException {
     if (config != null) {
@@ -91,7 +51,7 @@ public class MqttHandler {
     // if MILLIS_RECONNECT is zero, there will be no attempt to reconnect
     connect();
 
-    client.setCallback(new MyMqttCallback());
+    //client.setCallback(new MyMqttCallback());
 
     // client.subscribe("#", 1); // subscribe to everything with QoS = 1
 
@@ -132,11 +92,34 @@ public class MqttHandler {
     log.info("MQTT client connected");
   }
 
-  // TODO: do this such that wildcards work, which is currently not the case
-  // because the topic in messageArrived is not properly treated.
-  public void register(String topic, Predicate<byte[]> callback) throws MqttException {
-    callbacks.put(topic, callback);
-    client.subscribe(topic); // subscribe to everything with QoS = 1
+  /** Subscribe a callback that takes a message payload and processes it
+   *  immediately, returning true if the payload is as the callback expects it
+   *  to be.
+   *
+   * @param topic the topic to subscribe to. Can contain wildcards, handled by
+   *        the underlying library
+   * @param callback a predicate returning true if the payload could be
+   *        processed properly
+   * @throws MqttException if the subscription fails for some reason
+   */
+  public void register(String topic, Predicate<byte[]> callback)
+      throws MqttException {
+    // subscribe to everything with QoS = 1
+    client.subscribe(topic, new IMqttMessageListener() {
+
+      @Override
+      public void messageArrived(String topic, MqttMessage message)
+          throws Exception {
+        if (callback.test(message.getPayload())) {
+          try {
+            client.messageArrivedComplete(message.getId(), message.getQos());
+          } catch (MqttException e) {
+            log.error("{}", e);
+          }
+        } else {
+          log.warn("callback for topic {} failed.", topic);
+        }
+      }});
   }
 
   public void disconnect() throws MqttException {
