@@ -152,7 +152,7 @@ if __name__ == '__main__':
                         required=False, help='message dump file')
     parser.add_argument("-p", "--playback", type=str,
                         required=False, help='playback a file')
-    parser.add_argument('-k', '--keep-timing', action='store_true',
+    parser.add_argument('-d', '--delay', action='store_true',
                          help='keep delay between messages')
     parser.add_argument('-n', '--no-recording', action='store_true',
                         required=False, help='no recording (for playback)')
@@ -166,8 +166,6 @@ if __name__ == '__main__':
         config = { 'topics': ['#'] }
     if args.output_file:
         output_file = args.output_file
-    elif args.files:
-        output_file = args.files[0]
     elif 'output_file' in config:
         output_file = config['output_file']
     else:
@@ -178,5 +176,5 @@ if __name__ == '__main__':
     else:
         config['topics'] = []
     if args.playback:
-        m.playback(args.playback, log_sleep=args.keep_timing)
+        m.playback(args.playback, log_sleep=args.delay)
 
