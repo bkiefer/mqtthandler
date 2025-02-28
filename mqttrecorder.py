@@ -102,7 +102,7 @@ class MqttRecorder():
             self.__subscribe_topics(config['topics'])
             self.is_running = True
             self.out = open(output_file, 'w', encoding='utf-8')
-            self.mqtt_connect(forever=False)
+            self.mqtt_connect(forever=True)
         except Exception as e:
             print('Exception: {}'.format(e))
             self.out.close()
