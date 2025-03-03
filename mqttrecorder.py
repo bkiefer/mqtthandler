@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import sys
-
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 import time
@@ -177,4 +175,3 @@ if __name__ == '__main__':
         config['topics'] = []
     if args.playback:
         m.playback(args.playback, log_sleep=args.delay)
-
