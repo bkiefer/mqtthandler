@@ -1,10 +1,17 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
+import logging
 import time
 import yaml
 import argparse
 
+# configure logger
+logging.basicConfig(
+    format="%(asctime)s: %(levelname)s: %(message)s",
+    level=logging.INFO)
+logger = logging.getLogger(__file__)
+logger.setLevel(logging.INFO)
 
 class MqttRecorder():
     """
@@ -12,10 +19,22 @@ class MqttRecorder():
     under `topics` and dumps the incoming strings (this is a strong assumption) into a file, with timestamp.
     """
 
-
     def __init__(self, config):
         self.config = config
-        self.callbacks = {}
+        self.topics = {}
+        for topic in self.config['topics']:
+            if type(topic) is dict:
+                top = topic['topic']
+                # is callback function specified?
+                if 'callback' in topic:
+                    self.topics[top] = topic['callback']
+                else:
+                    self.topics[top] = self.dump_string
+                if 'qos' in topic:
+                    self.topics[top] = (self.topics[top], topic['qos'])
+            else:
+                self.topics[topic] = self.dump_string
+        self.topics['/recorder'] = self.__recorder_msgs
         self.out = None
         self.__init_client()
 
@@ -28,24 +47,20 @@ class MqttRecorder():
         self.client.on_subscribe = self._on_subscribe
         self.client.on_disconnect = self._on_disconnect
 
-    def __subscribe_topics(self, topics):
-        for topic in topics:
-            self.register_callback(topic, self.dump_string)
-        self.register_callback('/recorder', self.__recorder_msgs)
-
-    def __recorder_msgs(self, message):
+    def __recorder_msgs(self, client, userdata, message):
         msg = str(message.payload.decode("utf-8"))
         if msg == 'exit':
+            self.is_running = False
             self.mqtt_disconnect()
 
-    def dump_string(self, message):
+    def dump_string(self, client, userdata, message):
         now = time.time()
         msg = str(message.payload.decode("utf-8"))
         now = str(now)
         self.out.write(now + '\t' + message.topic + '\t' + msg + '\n')
 
 
-    def mqtt_connect(self, forever=False):
+    def mqtt_connect(self, wait_forever=False):
         host = 'localhost'
         port = 1883
         if 'mqtt_address' in self.config:
@@ -53,9 +68,9 @@ class MqttRecorder():
             host = hostport[0]
             if len(hostport) > 1:
                 port = int(hostport[1])
-        print("connecting to: " + host + " ", end="")
+        logger.info(f"connecting to: {host}:{port}")
         self.client.connect(host, port)
-        if forever:
+        if wait_forever:
             self.client.loop_forever()
         else:
             self.client.loop_start()
@@ -65,44 +80,48 @@ class MqttRecorder():
         self.client.disconnect()
 
     def _on_connect(self, client, userdata, flags, reason_code, properties):
-        print('CONNACK received with code %s. ' % str(reason_code), end="")
-        self.__subscribe_topics(self.config['topics'])
+        logger.info(f'CONNACK received with code {str(reason_code)}')
+        # subscribe to all registered topics/callbacks
+        for topic in self.topics:
+            qos = 0
+            if topic is tuple:
+                qos = topic[1]
+                topic = topic[0]
+            self.client.subscribe(topic, qos)
 
     def _on_subscribe(self, client, userdata, mid, reason_code_list, properties):
-        print("Subscribed: "+str(mid)+" "+str(reason_code_list))
+        logger.debug("Subscribed: "+str(properties)+" "+str(reason_code_list))
 
     def _on_message(self, client, userdata, message):
-        if message.topic not in self.callbacks.keys():
-            self.callbacks[message.topic] = None
-            for topic in self.callbacks:
+        logger.debug(f"Received message {str(message.payload)} on topic {message.topic} with QoS {str(message.qos)}")
+        if message.topic not in self.topics:
+            self.topics[message.topic] = None
+            for topic in self.topics:
                 if mqtt.topic_matches_sub(topic, message.topic):
-                    self.callbacks[message.topic] = self.callbacks[topic]
-        cb = self.callbacks[message.topic]
+                    self.topics[message.topic] = self.topics[topic]
+        cb = self.topics[message.topic]
         if cb is not None:
-            cb(message)
+            if cb is tuple:
+                cb = cb[0]  # second is qos
+            cb(client, userdata, message)
         return
 
     def _on_disconnect(self, client, userdata, flags, reason_code, properties):
         if self.out:
             self.out.close()
-        print('Disconnecting...')
+        logger.info('Disconnecting...')
         self.is_running = False
 
     def publish(self, topic: str, message: str):
         self.client.publish(topic, message)
 
-    def register_callback(self, topic: str, fn):
-        self.client.subscribe(topic)
-        self.callbacks[topic] = fn
-
-    def record(self, output_file):
+    def record(self, output_file, wait_forever=True):
         try:
-            self.__subscribe_topics(config['topics'])
             self.is_running = True
             self.out = open(output_file, 'w', encoding='utf-8')
-            self.mqtt_connect(forever=True)
+            self.mqtt_connect(wait_forever=wait_forever)
         except Exception as e:
-            print('Exception: {}'.format(e))
+            logger.error('Exception: {}'.format(e))
             self.out.close()
 
 
@@ -113,7 +132,7 @@ class MqttRecorder():
         """
         start = -1
         if not self.client.is_connected():
-            self.mqtt_connect(forever=False)
+            self.mqtt_connect()
         lines = 0
         # wait for proper connection
         while not self.client.is_connected():
@@ -122,7 +141,7 @@ class MqttRecorder():
             for line in f:
                 fields = line.strip().split('\t')
                 if len(fields) < 3:
-                    print('skipping line {}'.format(line))
+                    logger.info('skipping line {}'.format(line))
                     continue
                 when = float(fields[0])
                 wait = 0
@@ -136,10 +155,10 @@ class MqttRecorder():
                 lines += 1
                 self.publish(fields[1], fields[2])
         time.sleep(1.0)
-        print(f'{lines} messages sent')
+        logger.info(f'{lines} messages sent')
         self.mqtt_disconnect()
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(
         prog='MQTT Recorder',
         description='Listen to mqtt topics and dump messages published there to a log file',
@@ -161,17 +180,20 @@ if __name__ == '__main__':
         with open(args.config, 'r') as f:
             config = yaml.safe_load(f)
     else:
-        config = { 'topics': ['#'] }
+        config = { 'topics': { '#' } }
     if args.output_file:
         output_file = args.output_file
     elif 'output_file' in config:
         output_file = config['output_file']
     else:
-        output_file = 'out.log'
+        output_file = 'mqtt.log'
+    if args.no_recording:
+        config['topics'] = []
     m = MqttRecorder(config)
     if not args.no_recording:
-        m.record(output_file)
-    else:
-        config['topics'] = []
+        m.record(output_file, not args.playback)
     if args.playback:
         m.playback(args.playback, log_sleep=args.delay)
+
+if __name__ == '__main__':
+    main()

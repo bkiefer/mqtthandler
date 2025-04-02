@@ -9,6 +9,7 @@
 **/*~
 /nbproject/
 nbactions.xml
+/.idea/
 /0howto
 /Java8.g4
 /doc/quiz-abstract.txt
