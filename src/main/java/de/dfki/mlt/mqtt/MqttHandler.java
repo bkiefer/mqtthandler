@@ -1,6 +1,11 @@
 package de.dfki.mlt.mqtt;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.function.Predicate;
 
@@ -32,6 +37,21 @@ public class MqttHandler {
   String brokerhost = "localhost";
   int brokerport = 1883;
   int millis_reconnect = 0;
+
+
+  public static String bytesToString(byte[] b) {
+    StringBuilder sb = new StringBuilder();
+    int c;
+    try (Reader r = new InputStreamReader(new ByteArrayInputStream(b),
+        Charset.forName("UTF-8"))) {
+      while ((c = r.read()) >= 0) {
+        sb.append((char)c);
+      }
+    } catch (IOException ex) { // will not happen
+    }
+    return sb.toString();
+  }
+
 
   public MqttHandler(Map<String, Object> config) throws MqttException {
     if (config != null) {
