@@ -35,3 +35,7 @@ dependency-reduced-pom.xml
 ontologies
 wech
 compile_prereqs.sh
+
+.python-version
+uv.lock
+**/__pycache__
