@@ -1,0 +1,5 @@
+#!/bin/bash
+#set -x
+scrdir=`dirname $0`
+here=`pwd`
+uv run --project "$scrdir" "$scrdir"/mqttrecorder.py "$@"

@@ -22,9 +22,9 @@ import org.slf4j.LoggerFactory;
 public class MqttHandler {
   private static final Logger log = LoggerFactory.getLogger(MqttHandler.class);
 
-  public static final String CFG_MQTT_HOST = "brokerhost";
-  public static final String CFG_MQTT_PORT = "brokerport";
-  public static final String CFG_MQTT_PROTOCOL = "brokerprotocol";
+  public static final String CFG_MQTT_HOST = "host";
+  public static final String CFG_MQTT_PORT = "port";
+  public static final String CFG_MQTT_PROTOCOL = "protocol";
   public static final String CFG_MQTT_MILLIS_RECONNECT = "millis_reconnect";
 
   private int msgId = 0;
@@ -33,9 +33,9 @@ public class MqttHandler {
   private String myClientId = null;
   private MqttClient client;
 
-  String brokerprotocol = "tcp";
-  String brokerhost = "localhost";
-  int brokerport = 1883;
+  String protocol = "tcp";
+  String host = "localhost";
+  int port = 1883;
   int millis_reconnect = 0;
 
 
@@ -56,19 +56,19 @@ public class MqttHandler {
   public MqttHandler(Map<String, Object> config) throws MqttException {
     if (config != null) {
       if (config.containsKey(CFG_MQTT_HOST)) {
-        brokerhost = (String) config.get(CFG_MQTT_HOST);
+        host = (String) config.get(CFG_MQTT_HOST);
       }
       if (config.containsKey(CFG_MQTT_PORT)) {
-        brokerport = (Integer) config.get(CFG_MQTT_PORT);
+        port = (Integer) config.get(CFG_MQTT_PORT);
       }
       if (config.containsKey(CFG_MQTT_PROTOCOL)) {
-        brokerprotocol = (String) config.get(CFG_MQTT_PROTOCOL);
+        protocol = (String) config.get(CFG_MQTT_PROTOCOL);
       }
       if (config.containsKey(CFG_MQTT_MILLIS_RECONNECT)) {
         millis_reconnect = (Integer) config.get(CFG_MQTT_MILLIS_RECONNECT);
       }
     }
-    // if MILLIS_RECONNECT is zero, there will be no attempt to reconnect
+    // if millis_reconnect is zero, there will be no attempt to reconnect
     connect();
 
     //client.setCallback(new MyMqttCallback());
@@ -86,7 +86,7 @@ public class MqttHandler {
     // serverURI in format: "protocol://name:port"
     client =
         new MqttClient(
-            brokerprotocol + "://" + brokerhost + ":" + brokerport,
+            protocol + "://" + host + ":" + port,
             myClientId, // ClientId
             new MemoryPersistence()); // Persistence
 
@@ -106,7 +106,7 @@ public class MqttHandler {
       client.connect(options);
     } catch (Exception ex) {
       log.error("Connecting MQTT client on {}:{} failed: {}",
-          brokerhost, brokerport, ex.getMessage());
+          host, port, ex.getMessage());
       return;
     }
     log.info("MQTT client connected");
@@ -130,19 +130,20 @@ public class MqttHandler {
       @Override
       public void messageArrived(String topic, MqttMessage message)
           throws Exception {
-        if (callback.test(message.getPayload())) {
-          try {
+        try {
+          if (callback.test(message.getPayload())) {
             client.messageArrivedComplete(message.getId(), message.getQos());
-          } catch (MqttException e) {
-            log.error("{}", e);
+          } else {
+            log.warn("callback for topic {} failed.", topic);
           }
-        } else {
-          log.warn("callback for topic {} failed.", topic);
+        } catch (MqttException e) {
+          log.error("{}", e);
         }
       }});
   }
 
   public void disconnect() throws MqttException {
+    log.info("MQTT client disconnected");
     client.disconnect();
   }
 
