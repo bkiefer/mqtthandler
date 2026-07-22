@@ -1,5 +1,7 @@
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
+import yaml
+import argparse
 import logging
 
 logger: logging.Logger
@@ -10,10 +12,10 @@ class MqttClient():
                         'keepalive', 'clean_start',
                         'username', 'password' }
 
-    def __init__(self, pid: str, config):
+    def __init__(self, pid: str, config: dict):
         self.pid = pid
         self.topics = {}
-        for topic_spec in config['topics']:
+        for topic_spec in config.get('topics',[]):
             topic = None
             cb = ""
             qos = None
@@ -85,6 +87,7 @@ class MqttClient():
         return
 
     def mqtt_connect(self, forever = False):
+        logger.debug("Connecting to broker on {}", self.mqtt_config['host']);
         self.client.connect(**self.mqtt_config)
         if forever:
             self.client.loop_forever()
@@ -98,3 +101,52 @@ class MqttClient():
 
     def publish(self, topic: str, message: str):
         self.client.publish(topic, message)
+
+
+def print_string(client, userdata, message):
+    print(f'\n{message.payload.decode("utf-8")}\n')
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog='MQTT Client',
+        description='published messages to a given topic',
+        epilog='')
+    parser.add_argument("-H", "--host", type=str,
+                        required=False, help='broker host')
+    parser.add_argument("-t", "--topic", type=str,
+                        required=True, help='topic to publish messages to')
+    parser.add_argument("-p", "--port", type=str,
+                        required=False, help='broker port')
+    parser.add_argument("-i", "--interactive", action='store_true',
+                        default=False, required=False,
+                        help='ask for messages interactively')
+    parser.add_argument("-l", "--listen", action='store_true', default=False,
+                        required=False, help='print incoming messages')
+    parser.add_argument('msgs', metavar='msgs', type=str, nargs='*')
+    args = parser.parse_args()
+
+    config = {}
+    if args.listen:
+        config['topics'] = [( '#', "print_string" )]
+    if args.host:
+        config['host'] = args.host
+    if args.port:
+        config['port'] = args.port
+    m = MqttClient('cliclient', config)
+    m.mqtt_connect(False)
+    for f in args.msgs:
+        m.publish(args.topic, f)
+    if args.interactive:
+        while True:
+            inp = input(">")
+            if not inp:
+                break
+            m.publish(args.topic, inp)
+    m.mqtt_disconnect()
+
+
+if __name__ == '__main__':
+    logging.basicConfig(format="%(asctime)s: %(levelname)s: %(message)s",
+                        level=logging.WARN)
+    #mqtt_client.logger.setLevel(logging.DEBUG)
+    main()

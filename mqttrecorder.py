@@ -1,4 +1,3 @@
-#!/usr/bin/env -S python3 -u
 from mqtt_client import MqttClient
 import logging
 import time
@@ -49,7 +48,8 @@ class MqttRecorder(MqttClient):
         except Exception as e:
             logger.error('Exception: {}'.format(e))
             self.mqtt_disconnect()
-
+            if self.out:
+                self.out.close()
 
     def playback(self, input_file, log_sleep=False):
         """
