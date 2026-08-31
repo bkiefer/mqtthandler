@@ -208,6 +208,7 @@ public class MqttHandler {
           client.sendMessage(topic, m);
         }
       }
+      client.disconnect();
     } catch (MqttException ex) {
       System.out.println("Error connecting or sending messages: " + ex.getMessage());
       System.exit(1);
