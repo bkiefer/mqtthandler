@@ -22,9 +22,17 @@ public class TestTransfer {
   public void test()  {
 
     // start a listener, make sure a broker is running somewhere
-
+    MqttHandler listener = null;
     try {
-      MqttHandler listener = new MqttHandler(null);
+      listener = new MqttHandler(null);
+    } catch (MqttException mex) {
+      if (mex.getReasonCode() == MqttException.REASON_CODE_SERVER_CONNECT_ERROR) {
+        logger.warn("No MQTT connection possible, skipping test");
+        assumeTrue(false);
+        return;
+      }
+    }
+    try {
       listener.register("/my/test/topic", new Predicate<byte[]>() {
         @Override
         public boolean test(byte[] t) {

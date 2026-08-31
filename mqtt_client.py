@@ -1,6 +1,5 @@
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
-import yaml
 import argparse
 import logging
 
@@ -115,7 +114,7 @@ def main():
                         required=False, help='broker host')
     parser.add_argument("-t", "--topic", type=str,
                         required=True, help='topic to publish messages to')
-    parser.add_argument("-p", "--port", type=str,
+    parser.add_argument("-p", "--port", type=int,
                         required=False, help='broker port')
     parser.add_argument("-i", "--interactive", action='store_true',
                         default=False, required=False,

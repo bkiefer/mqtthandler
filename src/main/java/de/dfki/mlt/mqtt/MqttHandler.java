@@ -6,6 +6,8 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 
@@ -18,6 +20,10 @@ import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import joptsimple.OptionException;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
 
 public class MqttHandler {
   private static final Logger log = LoggerFactory.getLogger(MqttHandler.class);
@@ -107,7 +113,7 @@ public class MqttHandler {
     } catch (Exception ex) {
       log.error("Connecting MQTT client on {}:{} failed: {}",
           host, port, ex.getMessage());
-      return;
+      throw ex;
     }
     log.info("MQTT client connected");
   }
@@ -170,6 +176,41 @@ public class MqttHandler {
     } catch (MqttException e) {
       log.error("{}", e);
     } catch (InterruptedException e) {
+    }
+  }
+
+  /** Minimal functionality to be able to send messages to one topic */
+  public static void main(String[] args) {
+    OptionParser parser = new OptionParser("h:p:t:");
+    // parser.accepts("help");
+    OptionSet options = null;
+    Map<String, Object> conf = new HashMap<>();
+    try {
+      options = parser.parse(args);
+      //files = options.nonOptionArguments();
+      if (options.has("h")) {
+        conf.put(MqttHandler.CFG_MQTT_HOST, options.valueOf("h"));
+      }
+      if (options.has("h")) {
+        conf.put(MqttHandler.CFG_MQTT_PORT, options.valueOf("p"));
+      }
+    } catch (OptionException ex) {
+      System.out.println("Error parsing options: " + ex.getMessage());
+      System.exit(2);
+    }
+    List<String> messages = options.nonOptionArguments();
+
+    try {
+      MqttHandler client = new MqttHandler(conf);
+      if (options.has("t") && ! messages.isEmpty()) {
+        String topic = (String)options.valueOf("t");
+        for (String m: messages) {
+          client.sendMessage(topic, m);
+        }
+      }
+    } catch (MqttException ex) {
+      System.out.println("Error connecting or sending messages: " + ex.getMessage());
+      System.exit(1);
     }
   }
 }

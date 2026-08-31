@@ -47,6 +47,7 @@ class MqttRecorder(MqttClient):
             self.mqtt_connect(forever=wait_forever)
         except Exception as e:
             logger.error('Exception: {}'.format(e))
+        finally:
             self.mqtt_disconnect()
             if self.out:
                 self.out.close()
